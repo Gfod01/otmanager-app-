@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+<script src="js/firebase.js"></script>
+<!-- ถ้าใช้ Auth หรือ Storage ก็เพิ่มตามนี้ -->
+<!-- <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script> -->
+<!-- <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js"></script> -->
+  <link rel="manifest" href="manifest.json" />
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js');
+  }
+</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>แอพบันทึกโอที</title>
+<style>
+  :root {
+    --bg-light: #f0f2f5;
+    --fg-light: #333;
+    --card-light: #fff;
+    --bg-dark: #121212;
+    --fg-dark: #eee;
+    --card-dark: #1e1e1e;
+  }
+  [data-theme="light"] {
+    background-color: var(--bg-light);
+    color: var(--fg-light);
+  }
+  [data-theme="light"] .card {
+    background-color: var(--card-light);
+  }
+  [data-theme="dark"] {
+    background-color: var(--bg-dark);
+    color: var(--fg-dark);
+  }
+  [data-theme="dark"] .card {
+    background-color: var(--card-dark);
+  }
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0; padding: 0;
+    min-height: 100vh;
+  }
+  header {
+    background: #4a90e2;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  main {
+    max-width: 600px;
+    margin: 1rem auto;
+    padding: 1rem;
+  }
+  label, input, select, textarea, button {
+    display: block;
+    width: 100%;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+  }
+  button {
+    background-color: #4a90e2;
+    color: white;
+    border: none;
+    padding: 0.75rem;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .card {
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  }
+  .entry {
+    border-bottom: 1px solid #ccc;
+    padding: 0.5rem 0;
+  }
+  .entry:last-child {
+    border-bottom: none;
+  }
+  .entry button {
+    background: #e74c3c;
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
+  }
+  #controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  #controls > * {
+    flex: 1;
+  }
+</style>
+</head>
+<body>
+<header>
+  <img src="images/logo.png" alt="OT Manager Logo" style="height: 80px;" />
+  <h1 id="appTitle">แอพบันทึกโอที</h1>
+  <div id="controls">
+    <select id="langSelect" title="เลือกภาษา">
+      <option value="th">ไทย</option>
+      <option value="en">English</option>
+      <option value="mm">မြန်မာ</option>
+    </select>
+    <select id="themeSelect" title="ธีม">
+      <option value="light">สว่าง</option>
+      <option value="dark">มืด</option>
+    </select>
+  </div>
+</header>
+
+<main>
+  <section class="card" aria-label="ฟอร์มเพิ่มรายการโอที">
+    <h2 id="addOtTitle">เพิ่มรายการโอที</h2>
+    <label for="otDate" id="labelDate">วันที่</label>
+    <input type="date" id="otDate" />
+
+    <label for="otStart" id="labelStart">เวลาเริ่ม</label>
+    <input type="time" id="otStart" />
+
+    <label for="otEnd" id="labelEnd">เวลาสิ้นสุด</label>
+    <input type="time" id="otEnd" />
+
+    <label for="otType" id="labelType">ประเภท</label>
+    <select id="otType">
+      <option value="normal">วันธรรมดา</option>
+      <option value="holiday">วันหยุด</option>
+    </select>
+
+    <label for="otNote" id="labelNote">หมายเหตุ</label>
+    <textarea id="otNote" rows="2"></textarea>
+
+    <button id="addOtBtn">เพิ่มรายการ</button>
+  </section>
+
+  <section class="card" aria-label="สรุปโอที">
+    <h2 id="summaryTitle">สรุปโอที</h2>
+    <p id="summaryNormal">วันธรรมดา: 0.00 ชั่วโมง</p>
+    <p id="summaryHoliday">วันหยุด: 0.00 ชั่วโมง</p>
+    <p id="summaryWage">ค่าแรง: 372 บาท</p>
+    <p id="summaryTotal">ยอดรวมค่าโอที: 0.00 บาท</p>
+  </section>
+
+  <section class="card" aria-label="รายการโอที">
+    <h2 id="listTitle">รายการโอที</h2>
+    <div id="otList"></div>
+  </section>
+
+  <section class="card" aria-label="ส่งออกข้อมูล">
+    <h2 id="exportTitle">ส่งออกข้อมูล</h2>
+    <button id="exportCsvBtn">ส่งออก CSV</button>
+    <button id="exportPdfBtn">ส่งออก PDF</button>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(() => {
+  // ข้อความภาษา
+  const i18n = {
+    th: {
+      appTitle: "แอพบันทึกโอที",
+      addOtTitle: "เพิ่มรายการโอที",
+      labelDate: "วันที่",
+      labelStart: "เวลาเริ่ม",
+      labelEnd: "เวลาสิ้นสุด",
+      labelType: "ประเภท",
+      labelNote: "หมายเหตุ",
+      addOtBtn: "เพิ่มรายการ",
+      summaryTitle: "สรุปโอที",
+      summaryNormal: "วันธรรมดา: {hrs} ชั่วโมง",
+      summaryHoliday: "วันหยุด: {hrs} ชั่วโมง",
+      summaryWage: "ค่าแรง: {wage} บาท",
+      summaryTotal: "ยอดรวมค่าโอที: {pay} บาท",
+      listTitle: "รายการโอที",
+      exportTitle: "ส่งออกข้อมูล",
+      exportCsvBtn: "ส่งออก CSV",
+      exportPdfBtn: "ส่งออก PDF",
+      confirmDelete: "ต้องการลบรายการนี้หรือไม่?",
+      alertFillAll: "กรุณากรอกวันที่และเวลาให้ครบ",
+      alertTimeInvalid: "เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น",
+      deleteBtn: "ลบ"
+    },
+    en: {
+      appTitle: "OT Tracker",
+      addOtTitle: "Add OT Entry",
+      labelDate: "Date",
+      labelStart: "Start Time",
+      labelEnd: "End Time",
+      labelType: "Type",
+      labelNote: "Note",
+      addOtBtn: "Add Entry",
+      summaryTitle: "OT Summary",
+      summaryNormal: "Normal OT: {hrs} hrs",
+      summaryHoliday: "Holiday OT: {hrs} hrs",
+      summaryWage: "Wage: {wage} THB",
+      summaryTotal: "Total OT Pay: {pay} THB",
+      listTitle: "OT List",
+      exportTitle: "Export Data",
+      exportCsvBtn: "Export CSV",
+      exportPdfBtn: "Export PDF",
+      confirmDelete: "Delete this entry?",
+      alertFillAll: "Please fill all date/time fields.",
+      alertTimeInvalid: "End time must be after start time.",
+      deleteBtn: "Delete"
+    },
+    mm: {
+      appTitle: "OT မှတ်တမ်း",
+      addOtTitle: "OT မှတ်တမ်းထည့်ရန်",
+      labelDate: "နေ့ရက်",
+      labelStart: "စတင်ချိန်",
+      labelEnd: "ပြီးချိန်",
+      labelType: "အမျိုးအစား",
+      labelNote: "မှတ်ချက်",
+      addOtBtn: "ထည့်သွင်းရန်",
+      summaryTitle: "OT အကျဉ်းချုပ်",
+      summaryNormal: "ရုံးအချိန်နောက်ပိုင်း: {hrs} နာရီ",
+      summaryHoliday: "အားလပ်ရက်: {hrs} နာရီ",
+      summaryWage: "လစာ: {wage} ကျပ်",
+      summaryTotal: "OT စုစုပေါင်း: {pay} ကျပ်",
+      listTitle: "OT စာရင်း",
+      exportTitle: "ဒေတာပို့သည်",
+      exportCsvBtn: "CSV ပို့သည်",
+      exportPdfBtn: "PDF ပို့သည်",
+      confirmDelete: "ဤစာရင်းကို ဖျက်ရန်လား?",
+      alertFillAll: "နေ့ရက်နှင့်အချိန်များကိုဖြည့်ပါ",
+      alertTimeInvalid: "ပြီးချိန်သည် စတင်ချိန်ထက်ပိုကြီးရမည်",
+      deleteBtn: "ဖျက်ရန်"
+    }
+  };
+
+  const wageDefault = 372;
+  let currentLang = 'th';
+  let currentTheme = 'light';
+
+  const elems = {
+    appTitle: document.getElementById('appTitle'),
+    addOtTitle: document.getElementById('addOtTitle'),
+    labelDate: document.getElementById('labelDate'),
+    labelStart: document.getElementById('labelStart'),
+    labelEnd: document.getElementById('labelEnd'),
+    labelType: document.getElementById('labelType'),
+    labelNote: document.getElementById('labelNote'),
+    addOtBtn: document.getElementById('addOtBtn'),
+    summaryTitle: document.getElementById('summaryTitle'),
+    summaryNormal: document.getElementById('summaryNormal'),
+    summaryHoliday: document.getElementById('summaryHoliday'),
+    summaryWage: document.getElementById('summaryWage'),
+    summaryTotal: document.getElementById('summaryTotal'),
+    listTitle: document.getElementById('listTitle'),
+    exportTitle: document.getElementById('exportTitle'),
+    exportCsvBtn: document.getElementById('exportCsvBtn'),
+    exportPdfBtn: document.getElementById('exportPdfBtn'),
+    otDate: document.getElementById('otDate'),
+    otStart: document.getElementById('otStart'),
+    otEnd: document.getElementById('otEnd'),
+    otType: document.getElementById('otType'),
+    otNote: document.getElementById('otNote'),
+    otList: document.getElementById('otList'),
+    langSelect: document.getElementById('langSelect'),
+    themeSelect: document.getElementById('themeSelect')
+  };
+
+  function translateUI() {
+    const dict = i18n[currentLang];
+    for (const key in dict) {
+      if (elems[key]) {
+        elems[key].textContent = dict[key];
+      }
+    }
+    updateSummary();
+    renderList();
+  }
+
+  function loadData() {
+    try {
+      return JSON.parse(localStorage.getItem('otData') || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  function saveData(data) {
+    localStorage.setItem('otData', JSON.stringify(data));
+  }
+
+  function calcHours(start, end) {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+  }
+
+  function renderList() {
+    const data = loadData();
+    elems.otList.innerHTML = '';
+    const dict = i18n[currentLang];
+
+    data.forEach((entry, idx) => {
+      const hrs = calcHours(entry.start, entry.end);
+      const typeStr = entry.type === 'holiday' ? dict.summaryHoliday.replace('{hrs}', '').trim() : dict.summaryNormal.replace('{hrs}', '').trim();
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.innerHTML = `
+        <strong>${entry.date}</strong> (${typeStr})<br/>
+        ${entry.start} - ${entry.end} (${hrs.toFixed(2)} ${currentLang === 'en' ? 'hrs' : 'ชม.'})<br/>
+        <em>${entry.note}</em><br/>
+        <button data-idx="${idx}">${dict.deleteBtn}</button>
+      `;
+      elems.otList.appendChild(div);
+
+      div.querySelector('button').addEventListener('click', () => {
+        if (confirm(dict.confirmDelete)) {
+          const d = loadData();
+          d.splice(idx, 1);
+          saveData(d);
+          renderList();
+          updateSummary();
+        }
+      });
+    });
+  }
+
+  function updateSummary() {
+    const data = loadData();
+    let normalHrs = 0, holidayHrs = 0;
+    data.forEach(e => {
+      const hrs = calcHours(e.start, e.end);
+      if (hrs > 0) {
+        if (e.type === 'holiday') holidayHrs += hrs;
+        else normalHrs += hrs;
+      }
+    });
+    const wage = wageDefault;
+    const normalPay = (wage / 8) * 1.5 * normalHrs;
+    const holidayPay = (wage / 8) * 2 * holidayHrs;
+    const totalPay = normalPay + holidayPay;
+
+    elems.summaryNormal.textContent = i18n[currentLang].summaryNormal.replace('{hrs}', normalHrs.toFixed(2));
+    elems.summaryHoliday.textContent = i18n[currentLang].summaryHoliday.replace('{hrs}', holidayHrs.toFixed(2));
+    elems.summaryWage.textContent = i18n[currentLang].summaryWage.replace('{wage}', wage);
+    elems.summaryTotal.textContent = i18n[currentLang].summaryTotal.replace('{pay}', totalPay.toFixed(2));
+  }
+
+  elems.addOtBtn.addEventListener('click', () => {
+    const date = elems.otDate.value;
+    const start = elems.otStart.value;
+    const end = elems.otEnd.value;
+    const type = elems.otType.value;
+    const note = elems.otNote.value.trim();
+    const dict = i18n[currentLang];
+
+    if (!date || !start || !end) {
+      alert(dict.alertFillAll);
+      return;
+    }
+    if (calcHours(start, end) <= 0) {
+      alert(dict.alertTimeInvalid);
+      return;
+    }
+
+    const data = loadData();
+    data.push({ date, start, end, type, note });
+    saveData(data);
+
+    elems.otDate.value = '';
+    elems.otStart.value = '';
+    elems.otEnd.value = '';
+    elems.otNote.value = '';
+
+    renderList();
+    updateSummary();
+  });
+
+  elems.langSelect.value = currentLang;
+  elems.langSelect.addEventListener('change', (e) => {
+    currentLang = e.target.value;
+    translateUI();
+  });
+
+  elems.themeSelect.value = currentTheme;
+  elems.themeSelect.addEventListener('change', (e) => {
+    currentTheme = e.target.value;
+    document.documentElement.setAttribute('data-theme', currentTheme);
+  });
+  document.documentElement.setAttribute('data-theme', currentTheme);
+
+  // ส่งออก CSV
+  elems.exportCsvBtn.addEventListener('click', () => {
+    const data = loadData();
+    if (data.length === 0) {
+      alert(i18n[currentLang].exportCsvBtn + ': ไม่มีข้อมูลให้ส่งออก');
+      return;
+    }
+    const header = ['Date','Start Time','End Time','Type','Note','Hours'];
+    const rows = data.map(e => {
+      const hrs = calcHours(e.start, e.end).toFixed(2);
+      const typeStr = e.type === 'holiday' ? (currentLang==='en'?'Holiday':'วันหยุด') : (currentLang==='en'?'Normal':'วันธรรมดา');
+      return [e.date, e.start, e.end, typeStr, e.note, hrs];
+    });
+
+    const csvContent = [header, ...rows].map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ot_data.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // ส่งออก PDF
+  elems.exportPdfBtn.addEventListener('click', () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const data = loadData();
+    if (data.length === 0) {
+      alert(i18n[currentLang].exportPdfBtn + ': ไม่มีข้อมูลให้ส่งออก');
+      return;
+    }
+
+    doc.setFontSize(18);
+    doc.text(i18n[currentLang].appTitle, 14, 20);
+    doc.setFontSize(12);
+
+    const dict = i18n[currentLang];
+    const header = [dict.labelDate, dict.labelStart, dict.labelEnd, dict.labelType, dict.labelNote, 'Hours'];
+    let y = 30;
+    doc.text(header.join(' | '), 14, y);
+    y += 8;
+
+    data.forEach(e => {
+      const hrs = calcHours(e.start, e.end).toFixed(2);
+      const typeStr = e.type === 'holiday' ? (currentLang==='en'?'Holiday':'วันหยุด') : (currentLang==='en'?'Normal':'วันธรรมดา');
+      const line = [e.date, e.start, e.end, typeStr, e.note, hrs].join(' | ');
+      doc.text(line, 14, y);
+      y += 8;
+      if(y > 280) {
+        doc.addPage();
+        y = 20;
+      }
+    });
+
+    doc.save('ot_data.pdf');
+  });
+
+  // เริ่มต้น
+  translateUI();
+  renderList();
+  updateSummary();
+})();
+</script>
+</body>
+</html>
